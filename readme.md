@@ -10,12 +10,11 @@ This project is part of Experimental AI Global and Limited-area Ensemble project
 
 ## Overview
 
-The National Centers for Environmental Prediction (NCEP) provides GEFS data that can be used for ensemble weather prediction and analysis. Currently, a cron job is set up to transfer GEFS data from WCOSS2 to `NOAA-NCEPDEV-NONE-CA-UFS-CPLDCLD`
-bucket. 
+The National Centers for Environmental Prediction (NCEP) provides GEFS data that can be used for ensemble weather prediction and analysis. Currently, this dataset is not publicly avaiable. If you are interested in getting the data, please contact Jun Wang[Jun.Wang@noaa.gov](mailto:Jun.Wang@noaa.gov).
 
 ## Installation
 
-Creating an environment from an environment.yml file
+Creating an environment from an environment.yml file:
 
 ```bash
 conda env create -f environment.yml
@@ -31,16 +30,23 @@ conda activate graphcast
 ```bash
 aws s3 cp --recursive s3://noaa-nws-graphcastgfs-pds/EAGLE_ensemble/model_weights model_weights --no-sign-request
 ```
+There are three subdirectories:  
+`ens_weights/`: contains 31 model weights.
+`params/`: contains original graphcast model weight from Google DeepMind, which is used for initiallzing model.
+`stats/`: contains statistic files.
 
 ### Generate IC from an individual ensemble member:
 ```bash
-python gen_gefs_ics.py prev_datetime curr_datetime gefs_member -l 13 -o /path/to/output -d /path/to/download -k no
+python gen_gefs_ics.py prev_datetime curr_datetime "gefs_member" -l 13 -o /path/to/output -d /path/to/download -k no
 ```
+where "gefs_member" is from the list of ["c00", "p01", "p02", ..., "p30"].
 
 ### Run the model for an individual ensemble member:
 ```bash
-python run_graphcast_ens.py -i /path/to/inputfile -o /path/to/output -w /path/to/stats -m gefs_member -c /path/to/{gefs_member}.pkl  -l forecast_length(steps) -p num_pressure_levels -u no -k yes
+python run_graphcast_ens.py -i /path/to/inputfile -o /path/to/output -w /path/to/stats -m "gefs_member" -c /path/to/"model_id".pkl  -l forecast_length(steps) -p num_pressure_levels -u no -k yes
 ```
+where "model_id" is from the list of [0, 1, 2, ..., 30].
+
 Slurm jobs for 31 members can be submitted with `oper/submit_jobs.py`. Change the env path in `oper/gcjob_cloud_ens.sh` accordingly, then run the script:
 ```bash
 python submit_jobs.py -w /path/to/ens_weights
@@ -52,5 +58,5 @@ The model is running 4 times a day at 00Z, 06Z, 12Z and 18Z. The model outputs a
 ## Contact
 
 For questions or issues, please contact:\
-    [Linlin.Cui@noaa.gov](mailto:Linlin.Cui@noaa.gov)\
-    [Jun.Wang@noaa.gov](mailto:Jun.Wang@noaa.gov)
+    Linlin Cui [Linlin.Cui@noaa.gov](mailto:Linlin.Cui@noaa.gov)\
+    Jun Wang [Jun.Wang@noaa.gov](mailto:Jun.Wang@noaa.gov)
