@@ -194,10 +194,10 @@ class GraphCastModel:
         ds = ds.isel(time=slice(1, 2))
         ds['time'] = ds['time'] - pd.Timedelta(hours=6)
 
-        converter.save_grib2(self.dates, ds, self.gefs_member, self.output_dir)
+        converter.save_grib2(self.dates[0][1], ds, self.gefs_member, self.output_dir)
 
         # Call and save forecasts in grib2
-        converter.save_grib2(self.dates, forecasts, self.gefs_member, self.output_dir)
+        converter.save_grib2(self.dates[0][1], forecasts, self.gefs_member, self.output_dir)
         
     
     def upload_to_s3(self, keep_data):

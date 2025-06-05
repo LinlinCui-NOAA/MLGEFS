@@ -22,30 +22,30 @@ class Netcdf2Grib:
         with open(table_file, 'r') as f:
             self.attrs = json.load(f)
 
-    def save_grib2(self, startdate, xarray_ds, outdir):
+    def save_grib2(self, start_datetime, xarray_ds, gefs_member, outdir):
 
         xarray_ds['geopotential'] = xarray_ds['geopotential'] / 9.80665
 
-        if 'total_precipitation_12hr' in xarray_ds:
-            xarray_ds['total_precipitation_12hr'] = xarray_ds['total_precipitation_12hr'] * 1000
-        xarray_ds['total_precipitation_cumsum'] = xarray_ds['total_precipitation_12hr'].cumsum(axis=0)
+        if 'total_precipitation_6hr' in xarray_ds:
+            xarray_ds['total_precipitation_6hr'] = xarray_ds['total_precipitation_6hr'] * 1000
+        xarray_ds['total_precipitation_cumsum'] = xarray_ds['total_precipitation_6hr'].cumsum(axis=0)
 
         xarray_ds['level'] = xarray_ds['level'] * 100
         xarray_ds = xarray_ds.squeeze(dim='batch')
 
         nt = int(xarray_ds.time.shape[0])
-        for index, it in enumerate(np.arange(nt)):
+        for index, time_index in enumerate(np.arange(nt)):
             da = xarray_ds.isel(time=time_index)
 
-            cycle = startdate.hour
-            outfile = os.path.join(outdir, f'graphcastgfs.t{cycle:02d}z.pgrb2.0p25.f{(time_index+1)*6:03d}')
+            cycle = start_datetime.hour
+            outfile = os.path.join(outdir, f'pmlgefs{gefs_member}.t{cycle:02d}z.pgrb2.0p25.f{(time_index+1)*6:03d}')
 
             #delelte the old file
             if os.path.isfile(outfile):
                 os.remove(outfile)
 
             values = da.values
-            current_date = startdate + da.time.values
+            current_date = start_datetime + da.time.values
 
 
             for var in self.attrs:
@@ -80,8 +80,9 @@ if __name__ == "__main__":
     ds = xr.open_dataset('forecasts_levels-13_steps-64.nc')
 
     t0 = time()
-    outdir = './forecasts_levels-13'
+    outdir = './forecasts_levels-13_c00'
+    member = 'c00'
     converter = Netcdf2Grib(table_file)
-    converter.save_grib2(startdate, ds, outdir)
+    converter.save_grib2(startdate, ds, member, outdir)
 
     print(f'It took {(time()-t0)/60} mins')

@@ -32,7 +32,7 @@ aws s3 cp --recursive s3://noaa-nws-graphcastgfs-pds/EAGLE_ensemble/model_weight
 ```
 There are three subdirectories:  
 `ens_weights/`: contains 31 model weights.
-`params/`: contains original graphcast model weight from Google DeepMind, which is used for initiallzing model.
+`params/`: contains original graphcast model weight from Google DeepMind, which is used for initializing model.
 `stats/`: contains statistic files.
 
 ### Generate IC from an individual ensemble member:
