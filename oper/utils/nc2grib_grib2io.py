@@ -34,11 +34,12 @@ class Netcdf2Grib:
         xarray_ds = xarray_ds.squeeze(dim='batch')
 
         nt = int(xarray_ds.time.shape[0])
-        for index, time_index in enumerate(np.arange(nt)):
+        for time_index in np.arange(nt):
             da = xarray_ds.isel(time=time_index)
 
+            forecast_hour = int(da.time.values / np.timedelta64(1, 's') / 3600)
             cycle = start_datetime.hour
-            outfile = os.path.join(outdir, f'pmlgefs{gefs_member}.t{cycle:02d}z.pgrb2.0p25.f{(time_index+1)*6:03d}')
+            outfile = os.path.join(outdir, f'pmlgefs{gefs_member}.t{cycle:02d}z.pgrb2.0p25.f{forecast_hour:03d}')
 
             #delelte the old file
             if os.path.isfile(outfile):
@@ -76,13 +77,28 @@ if __name__ == "__main__":
     
     table_file = 'tables.json'
     
-    startdate = pd.to_datetime('2024-04-01 00:00:00')
-    ds = xr.open_dataset('forecasts_levels-13_steps-64.nc')
+    startdate = pd.to_datetime('2024-02-05 12:00:00')
+
+    # f000
+    current_batch = xr.open_dataset('source-gdas_date-2024020512_res-0.25_levels-13_steps-2.nc').compute()
+    ds0 = current_batch.drop_vars(['geopotential_at_surface','land_sea_mask'])
+    for var in ds0.data_vars:
+        if 'long_name' in ds0[var].attrs:
+            del ds0[var].attrs['long_name']
+    ds0 = ds0.isel(time=[1])
+    ds0['time'] = ds0['time'] - pd.Timedelta(hours=6)
 
     t0 = time()
     outdir = './forecasts_levels-13_c00'
     member = 'c00'
     converter = Netcdf2Grib(table_file)
+    converter.save_grib2(startdate, ds0, member, outdir)
+
+    # f006 - f384
+    ds = xr.open_dataset('forecasts_levels-13_steps-64.nc')
     converter.save_grib2(startdate, ds, member, outdir)
 
+    ds0.close()
+    ds.close()
+    current_batch.close()
     print(f'It took {(time()-t0)/60} mins')
