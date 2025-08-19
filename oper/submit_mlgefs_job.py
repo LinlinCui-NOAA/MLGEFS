@@ -44,7 +44,7 @@ def get_job_id(command):
     return job_id
 
 
-def submit_slurm_run(member, param, model_id, curr_datetime, prev_datetime):
+def submit_job_wcoss2(member, param, model_id, curr_datetime, prev_datetime):
 
     #Step 1 - generate input file
     command1 = [
@@ -105,4 +105,4 @@ if __name__ == '__main__':
             member = f'p{int(key):02d}'
 
         param = f'{param_path}/{values.get("params")}'
-        submit_slurm_run(member, param, key, curr_datetime.strftime("%Y%m%d%H"), prev_datetime.strftime("%Y%m%d%H"))
+        submit_job_wcoss2(member, param, key, curr_datetime.strftime("%Y%m%d%H"), prev_datetime.strftime("%Y%m%d%H"))
