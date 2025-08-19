@@ -27,7 +27,6 @@ from graphcast import graphcast
 from graphcast import normalization
 from graphcast import rollout
 
-from utils.nc2grib import Netcdf2Grib
 
 class GraphCastModel:
     def __init__(self, pretrained_model_path, gdas_data_path, gefs_member, config_file, output_dir=None, num_pressure_levels=13, forecast_length=40):
@@ -183,8 +182,6 @@ class GraphCastModel:
 
     def save_grib2(self, forecasts):
 
-        converter = Netcdf2Grib()
-
         # Call and save f000 in grib2
         ds = self.current_batch
         ds = ds.drop_vars(['geopotential_at_surface','land_sea_mask', 'total_precipitation_6hr'])
@@ -194,12 +191,27 @@ class GraphCastModel:
         ds = ds.isel(time=slice(1, 2))
         ds['time'] = ds['time'] - pd.Timedelta(hours=6)
 
-        converter.save_grib2(self.dates, ds, self.gefs_member, self.output_dir)
+        #if self.method == "iris":
+        #    from utils.nc2grib import Netcdf2Grib
+
+        #    converter = Netcdf2Grib()
+        #    converter.save_grib2(self.dates[0][1], ds, self.gefs_member, self.output_dir)
+
+        #    # Call and save forecasts in grib2
+        #    converter.save_grib2(self.dates[0][1], forecasts, self.gefs_member, self.output_dir)
+
+        #elif self.method == "grib2io":
+        from utils.grib2io import Netcdf2Grib
+
+        converter = Netcdf2Grib(self.dates[0][1])
+        converter.save_grib2(ds, self.gefs_member, self.output_dir)
 
         # Call and save forecasts in grib2
-        converter.save_grib2(self.dates, forecasts, self.gefs_member, self.output_dir)
+        converter.save_grib2(forecasts, self.gefs_member, self.output_dir)
+
+        #else:
+        #    raise ValueError(f"Method {self.method} is not supported. Choose either 'iris' or 'grib2io'!")
         
-    
     def upload_to_s3(self, keep_data):
         s3 = boto3.client('s3')
         

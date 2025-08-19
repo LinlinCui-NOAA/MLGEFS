@@ -20,14 +20,25 @@ from botocore.config import Config
 from botocore import UNSIGNED
 import pygrib
 import requests
-from bs4 import BeautifulSoup
 
 
 class GFSDataProcessor:
-    def __init__(self, start_datetime, end_datetime, member, num_pressure_levels=13, output_directory=None, download_directory=None, keep_downloaded_data=True, aws=None):
+    def __init__(
+        self,
+        start_datetime, 
+        end_datetime, 
+        member, 
+        num_pressure_levels=13, 
+        data_source = 's3',
+        output_directory=None, 
+        download_directory=None, 
+        keep_downloaded_data=True, 
+        aws=None
+    ):
         self.start_datetime = start_datetime
         self.end_datetime = end_datetime
         self.num_levels = num_pressure_levels
+        self.data_source = data_source
         self.output_directory = output_directory
         self.download_directory = download_directory
         self.keep_downloaded_data = keep_downloaded_data
@@ -77,12 +88,34 @@ class GFSDataProcessor:
                     # Download the file from S3 to the local path
                     self.s3.download_file(self.bucket_name, obj_key, local_file_path)
                     print(f"Downloaded {obj_key} to {local_file_path}")
-
                  
         for file_format in self.file_formats:
             curr_file = f"ge{self.member}.t{time_str}z.{file_format}"
             get_data(s3_prefix, curr_file, local_directory)
         
+    def archive(self, date_str, time_str, local_directory):
+        data_path = "/lfs/h2/emc/ptmp/jun.wang"
+
+        def get_data(data_path, file_format, local_directory):
+            # List objects
+            file_objects = glob.glob(f"{data_path}/gefs.{date_str}/{time_str}/*/*/*")
+            for obj_key in file_objects:
+                if obj_key.endswith(f'{file_format}'):
+
+                    # Define the local file path
+                    local_file_path = os.path.join(local_directory, os.path.basename(obj_key))
+                    
+                    # Move data to the local path
+                    try:
+                        os.symlink(obj_key, local_file_path)
+                        print(f"Symbolic link created: {obj_key} -> {local_directory}")
+                    except OSError as e:
+                        print(f"Error creating symbolic link: {e}")
+
+        for file_format in self.file_formats:
+            curr_file = f"ge{self.member}.t{time_str}z.{file_format}"
+            get_data(data_path, curr_file, local_directory)
+
     def download_data(self):
         # Calculate the number of 6-hour intervals
         delta = (self.end_datetime - self.start_datetime)
@@ -100,11 +133,13 @@ class GFSDataProcessor:
             # Create the local directory if it doesn't exist
             os.makedirs(local_directory, exist_ok=True)
             
-            
-            self.s3bucket(date_str, time_str, local_directory)
+            if self.data_source == 's3':
+                self.s3bucket(date_str, time_str, local_directory)
+            elif self.data_source == 'wcoss2':
+                self.archive(date_str, time_str, local_directory)
+            else:
+                raise ValueError(f'data source {self.data_source} is not supported, choose either s3 or wcoss2!')
                 
-            
-
             # Move to the next 6-hour interval
             current_datetime += timedelta(hours=6)
 
@@ -284,6 +319,8 @@ class GFSDataProcessor:
 
         if self.output_directory is None:
             self.output_directory = os.getcwd()  # Use current directory if not specified
+
+        os.makedirs(self.output_directory, exist_ok=True)
         output_netcdf = os.path.join(self.output_directory, f"source-ge{self.member}_date-{date}_res-0.25_levels-{self.num_levels}_steps-{steps}.nc")
 
         # Save the merged dataset as a NetCDF file
@@ -540,6 +577,7 @@ if __name__ == "__main__":
     parser.add_argument("member", help="GEFS member options: [c00, p01, ..., p30]")
     parser.add_argument("-l", "--levels", help="number of pressure levels, options: 13, 37", default="13")
     parser.add_argument("-m", "--method", help="method to extract variables from grib2, options: wgrib2, pygrib", default="wgrib2")
+    parser.add_argument("-s", "--source", help="the source repository to download gdas grib2 data, options: s3 or wcoss2", default="s3")
     parser.add_argument("-o", "--output", help="Output directory for processed data")
     parser.add_argument("-d", "--download", help="Download directory for raw data")
     parser.add_argument("-k", "--keep", help="Keep downloaded data (yes or no)", default="no")
@@ -551,11 +589,22 @@ if __name__ == "__main__":
     member = args.member
     num_pressure_levels = int(args.levels)
     method = args.method
+    data_source = args.source
     output_directory = args.output
     download_directory = args.download
     keep_downloaded_data = args.keep.lower() == "yes"
     
-    data_processor = GFSDataProcessor(start_datetime, end_datetime, member, num_pressure_levels, output_directory, download_directory, keep_downloaded_data)
+    data_processor = GFSDataProcessor(
+        start_datetime, 
+        end_datetime, 
+        member, 
+        num_pressure_levels, 
+        data_source, 
+        output_directory, 
+        download_directory, 
+        keep_downloaded_data
+    )
+
     data_processor.download_data()
     
     if method == "wgrib2":

@@ -58,11 +58,11 @@ class Netcdf2Grib:
         yield grib_message
 
     #def save_grib2(self, dates, forecasts, outdir):
-    def save_grib2(self, dates, forecasts, gefs_member, outdir):
+    def save_grib2(self, start_datetime, forecasts, gefs_member, outdir):
         """
         Convert netCDF file to GRIB2 format file.
             Args:
-              dates: array of datetime object, from the source file
+              start_datetime: forecast initialization time, datetime object
               forecasts: xarray forecasts dataset
               outdir: output directory
         
@@ -91,7 +91,7 @@ class Netcdf2Grib:
         # Load cubes from netCDF file
         cubes = iris.load(filename)
         times = cubes[0].coord('time').points
-        forecast_starttime = dates[0][1]
+        forecast_starttime = start_datetime 
         cycle = forecast_starttime.hour
         print(f'Forecast start time is {forecast_starttime}')
 
@@ -108,7 +108,7 @@ class Netcdf2Grib:
             print(f"Processing for time {date.strftime('%Y-%m-%d %H:00:00')}")
             hrs = int((date - forecast_starttime).total_seconds() // 3600)
             #outfile = os.path.join(outdir, f'graphcastgfs.t{cycle:02d}z.pgrb2.0p25.f{hrs:03d}')
-            outfile = os.path.join(outdir, f'pmlgefs{gefs_member}.t{cycle:02d}z.pgrb2.0p25.f{hrs:03d}')
+            outfile = os.path.join(outdir, f'mlgefs{gefs_member}.t{cycle:02d}z.pgrb2.0p25.f{hrs:03d}')
             print(outfile)
 
             for cube in sorted(cubes, key=lambda cube: cube.name()):
