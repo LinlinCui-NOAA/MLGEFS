@@ -48,6 +48,7 @@ if [ "$pert" = "" ]; then
        export MODELNAME="MGFT"
    fi
 else
+   #export COMINgfs=/lfs/h2/emc/nems/noscrub/linlin.cui/Tests/eagle_ensemble/$PDY$cyc
    export COMINgfs=$DATAROOT/mlgefs.$PDY
    pertmember=`echo $pert | cut -c2-3`
    weight=$(expr $pertmember + 0)
@@ -56,7 +57,7 @@ else
    export modelname="M"$(echo "$pert" | tr '[:lower:]' '[:upper:]')
 fi
 #model history files
-export COMINsyn=/lfs/h2/emc/nems/noscrub/linlin.cui/Tests/eagle_ensemble/tracker/syndat
+export COMINsyn=/lfs/h1/ops/prod/com/gfs/v16.3/syndat
 
 # CALL executable job script here
 $PACKAGEROOT/jobs/JAIGFS_CYCLONE_TRACK
