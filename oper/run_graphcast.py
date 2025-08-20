@@ -29,18 +29,27 @@ from graphcast import rollout
 
 
 class GraphCastModel:
-    def __init__(self, pretrained_model_path, gdas_data_path, gefs_member, config_file, output_dir=None, num_pressure_levels=13, forecast_length=40):
+    def __init__(
+        self, 
+        pretrained_model_path, 
+        gdas_data_path, 
+        member: str, 
+        config_file=None, 
+        output_dir=None, 
+        num_pressure_levels=13, 
+        forecast_length=64
+    ):
         self.pretrained_model_path = pretrained_model_path
         self.gdas_data_path = gdas_data_path
         self.forecast_length = forecast_length
         self.num_pressure_levels = num_pressure_levels
-        self.gefs_member = gefs_member
+        self.member = member
         self.config_file_path = config_file
         
         if output_dir is None:
-            self.output_dir = os.path.join(os.getcwd(), f"forecasts_{str(self.num_pressure_levels)}_levels_{self.gefs_member}_model_{int(gefs_member[1:])}")  # Use current directory if not specified
+            self.output_dir = os.getcwd()
         else:
-            self.output_dir = os.path.join(output_dir, f"forecasts_{str(self.num_pressure_levels)}_levels_{self.gefs_member}_model_{int(gefs_member[1:])}")
+            self.output_dir = output_dir
         os.makedirs(self.output_dir, exist_ok=True)
         
         self.params = None
@@ -61,18 +70,23 @@ class GraphCastModel:
     def load_pretrained_model(self):
         """Load pre-trained GraphCast model."""
         if self.num_pressure_levels==13:
-            model_weights_path = f"{self.pretrained_model_path}/params/GraphCast_operational - ERA5-HRES 1979-2021 - resolution 0.25 - pressure levels 13 - mesh 2to6 - precipitation output only.npz"
+            model_weights_path = f"{self.pretrained_model_path}/params/GCGFSv2_finetuned - GDAS - ERA5 - resolution 0.25 - pressure levels 13 - mesh 2to6 - precipitation output only.npz"
         else:
             model_weights_path = f"{self.pretrained_model_path}/params/GraphCast - ERA5 1979-2017 - resolution 0.25 - pressure levels 37 - mesh 2to6 - precipitation input and output.npz"
 
         with open(model_weights_path, "rb") as f:
             ckpt = checkpoint.load(f, graphcast.CheckPoint)
-            # self.params = ckpt.params
+            #self.params = ckpt.params
             self.state = {}
             self.model_config = ckpt.model_config
             self.task_config = ckpt.task_config
-            with open(self.config_file_path, 'rb') as f:
-                self.params = pickle.load(f)
+
+            #update params
+            if self.config_file_path is not None:
+                with open(self.config_file_path, 'rb') as f:
+                    self.params = pickle.load(f)
+            else:
+                self.params = ckpt.params
 
     def load_gdas_data(self):
         """Load GDAS data."""
@@ -195,19 +209,19 @@ class GraphCastModel:
         #    from utils.nc2grib import Netcdf2Grib
 
         #    converter = Netcdf2Grib()
-        #    converter.save_grib2(self.dates[0][1], ds, self.gefs_member, self.output_dir)
+        #    converter.save_grib2(self.dates[0][1], ds, self.member, self.output_dir)
 
         #    # Call and save forecasts in grib2
-        #    converter.save_grib2(self.dates[0][1], forecasts, self.gefs_member, self.output_dir)
+        #    converter.save_grib2(self.dates[0][1], forecasts, self.member, self.output_dir)
 
         #elif self.method == "grib2io":
         from utils.grib2io import Netcdf2Grib
 
         converter = Netcdf2Grib(self.dates[0][1])
-        converter.save_grib2(ds, self.gefs_member, self.output_dir)
+        converter.save_grib2(ds, self.member, self.output_dir)
 
         # Call and save forecasts in grib2
-        converter.save_grib2(forecasts, self.gefs_member, self.output_dir)
+        converter.save_grib2(forecasts, self.member, self.output_dir)
 
         #else:
         #    raise ValueError(f"Method {self.method} is not supported. Choose either 'iris' or 'grib2io'!")
@@ -269,8 +283,9 @@ if __name__ == "__main__":
     parser.add_argument("-i", "--input", help="input file path (including file name)", required=True)
     parser.add_argument("-w", "--weights", help="parent directory of the graphcast params and stats", required=True)
     parser.add_argument("-l", "--length", help="length of forecast (6-hourly), an integer number in range [1, 40]", required=True)
-    parser.add_argument("-m", "--member", help="gefs member [c00, p01, ..., p30]", required=True)
-    parser.add_argument("-c", "--config", help="GC weight member file", required=True)
+    parser.add_argument("-m", "--member", help="mlgfs, or gefs member [mlgec00, mlgep01, ..., mlgep30]", required=True)
+    #parser.add_argument("-c", "--config", help="GC weight member file", required=True)
+    parser.add_argument("-c", "--config", help="GC weight member file", default=None)
     parser.add_argument("-o", "--output", help="output directory", default=None)
     parser.add_argument("-p", "--pressure", help="number of pressure levels", default=13)
     parser.add_argument("-u", "--upload", help="upload input data as well as forecasts to noaa s3 bucket (yes or no)", default = "no")

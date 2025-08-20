@@ -13,7 +13,7 @@ model=aigefs
 
 ## HOMEnaefs will de defined by the eclfow apps
 
-export HOMEaigefs=/lfs/h2/emc/nems/noscrub/$USER/git/others/avgspr
+export HOMEaigefs=/lfs/h2/emc/nems/noscrub/$USER/git/LinlinCui-NOAA/avgspr
 source $HOMEaigefs/versions/run.ver
 
 cd $PBS_O_WORKDIR

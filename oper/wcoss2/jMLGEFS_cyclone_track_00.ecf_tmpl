@@ -1,0 +1,86 @@
+#!/bin/bash
+
+#PBS -o {out}
+#PBS -e {err}
+#PBS -N {job_name}
+#PBS -A GFS-DEV
+#PBS -q dev
+#PBS -W depend=afterok:{jobid}
+#PBS -l place=vscatter,select=1:ncpus=1:mpiprocs=1:mem=10G
+#PBS -l place=excl
+#PBS -l walltime=00:30:00
+
+#%include <head.h> 
+#%include <envir-p2.h>
+
+export clustername=wcoss2
+export PACKAGEROOT=/lfs/h2/emc/nems/noscrub/linlin.cui/git/LinlinCui-NOAA/TC_tracker
+module use $PACKAGEROOT/modulefiles
+module load $clustername.lua
+module list
+
+set -x
+export envir=dev
+
+#export PACKAGEROOT=/lfs/h2/emc/nems/noscrub/linlin.cui/git/LinlinCui-NOAA/TC_tracker/TC_tracker
+export DATAROOT=/lfs/h2/emc/ptmp/$USER
+export COMROOT=$DATAROOT/com/mlgefs
+export KEEPDATA=NO
+
+# experiment configurations:
+export PDY={ymd}
+export cyc={cyc}
+export job=aigfs_track_$cyc
+#member: EAGLE_SOLO:"", EAGLE_ENSEMBLE:c00, p01, ... , p30, weight: 0, 1, 2, ..., 30
+# EAGLE SOLO:
+#export pert=""
+#export modelversion=""
+# EAGLE ensemble
+export pert={ensemble_member}
+#modelname has to be 4 letters, EAGLE_SOLO:MGFS/MGFT, EAGLE_ENSEMBLE:MC00, MP01, ..., MP30
+if [ "$pert" = "" ]; then
+   export COMINgfs=$DATAROOT/mlgfs.$PDY
+   export ensmemble=""
+   export fileprefix=mlgfs
+   if [ "$modelversion" = "" ]; then
+       export MODELNAME="MGFS"
+   elif [ "$modelversion" = "_test" ]; then
+       export MODELNAME="MGFT"
+   fi
+else
+   #export COMINgfs=/lfs/h2/emc/nems/noscrub/linlin.cui/Tests/eagle_ensemble/$PDY$cyc
+   export COMINgfs=$DATAROOT/mlgefs.$PDY
+   pertmember=`echo $pert | cut -c2-3`
+   weight=$(expr $pertmember + 0)
+   export ensmember=""
+   export fileprefix=ml$pert
+   export modelname="M"$(echo "$pert" | tr '[:lower:]' '[:upper:]')
+fi
+#model history files
+export COMINsyn=/lfs/h1/ops/prod/com/gfs/v16.3/syndat
+
+# CALL executable job script here
+$PACKAGEROOT/jobs/JAIGFS_CYCLONE_TRACK
+
+if [ $? -ne 0 ]; then
+  echo "tracker run FAILED"
+  exit
+else
+  echo "tracker run FINISHED"
+fi
+
+#%include <tail.h> 
+#%manual
+######################################################################
+#PURPOSE:  Executes the job that creates GFS TC track forecasts
+######################################################################
+
+######################################################################
+# Job specific troubleshooting instructions:
+#  see generic troubleshoot manual page
+#
+######################################################################
+
+# include manual page below
+#%end
+
