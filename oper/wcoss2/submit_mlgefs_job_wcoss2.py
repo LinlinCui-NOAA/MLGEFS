@@ -11,7 +11,8 @@ import tempfile
 
 import numpy as np
 
-def get_closest_cycle(now=None, cycles=None): 
+def get_closest_cycle(now=None, cycles=[0, 6, 12, 18]): 
+
     if now is None:
         #now = datetime.datetime.now(datetime.UTC)
         now = datetime.datetime.utcnow()
@@ -28,7 +29,6 @@ def get_closest_cycle(now=None, cycles=None):
     #return cycle_time - datetime.timedelta(hours=6)
     return cycle_time
 
-
 def get_job_id(command):
     result = subprocess.run(
         command, 
@@ -43,7 +43,6 @@ def get_job_id(command):
     job_id = result.stdout.strip().split()[-1]
 
     return job_id
-
 
 def submit_job_wcoss2(member, param, model_id, curr_datetime, prev_datetime):
     ymd=curr_datetime[:8]
@@ -71,9 +70,9 @@ def submit_job_wcoss2(member, param, model_id, curr_datetime, prev_datetime):
     #num_pressure_levels=13
     #forecast_length=64
     model_weights=/lfs/h2/emc/nems/noscrub/jun.wang/mlwp/aiml/gc_weights
-    DATAROOT=/lfs/h2/emc/ptmp/linlin.cui
+    DATAROOT=/lfs/h2/emc/ptmp/$USER
 
-    cd /lfs/h2/emc/nems/noscrub/linlin.cui/Tests/eagle_ensemble
+    cd /lfs/h2/emc/nems/noscrub/$USER/mlglobal/oper/wcoss2
 
     # get input data
     python3 gen_gefs_ics.py {prev_datetime} {curr_datetime} {member} -l 13 -s wcoss2 -o $DATAROOT/mlgefs.{ymd}/{cyc} -d $DATAROOT/mlgefs.{ymd}/{cyc}
@@ -106,30 +105,40 @@ def submit_job_wcoss2(member, param, model_id, curr_datetime, prev_datetime):
     command2 = ['qsub', jobcard]
     job_id2 = get_job_id(command2)
 
+    return job_id1
+
+def compute_avgspr(ids, curr_datetime):
+    PDY = curr_datetime[:8]
+    cyc = curr_datetime[8:]
+    dep_str = ":".join(ids)
+    tpl = pathlib.Path("jaigefs_ens_debias.ecf_tmpl").read_text()
+    rendered = tpl.format(
+        jobid = dep_str, 
+        PDY = PDY, 
+        cyc = cyc,
+    )
+    jobcard = f"job.pbs"
+    pathlib.Path(jobcard).write_text(rendered)
+    command = ['qsub', jobcard]
+    job_id = get_job_id(command)
 
 if __name__ == '__main__':
 
-    #hostname = socket.gethostname()
-    #if hostname.startswith('ufe'):
-    #    param_path = '/scratch3/NCEPDEV/nems/Linlin.Cui/Tests/MLGEFSv1.0/oper/graphcast_gefs_params'
-    #elif hostname.startswith('linlincui'):
-    #    param_path = '/lustre2/Linlin.Cui/MLGEFSv1.0/weights'
-    #else:
-    #    raise NotImplementedError(f'{hostname} is not supported yet!')
     param_path = '/lfs/h2/emc/nems/noscrub/linlin.cui/Tests/eagle_ensemble/model_weights'
 
-    with open('model_weights.json', 'r') as file:
+    with open('../model_weights.json', 'r') as file:
         models = json.load(file)
 
     #Get current forecast cycle
-    cycles = [0, 6, 12, 18]
-    #now = datetime.datetime(2025, 8, 15, 19, 16)
-    now = None
-    curr_datetime = get_closest_cycle(now=now, cycles=cycles)
+    #If run a hindcast, specify a datetime here, otherwise use now = None
+    now = datetime.datetime(2025, 8, 19, 6)
+    #now = None
+    curr_datetime = get_closest_cycle(now=now)
     prev_datetime = curr_datetime - datetime.timedelta(hours=6)
     print(f'curr_datetime: {curr_datetime}')
     print(f'prev_datetime: {prev_datetime}')
 
+    job_ids = []
     for key, values in models.items():
         if key == '0':
             member = f'c{int(key):02d}'
@@ -137,4 +146,8 @@ if __name__ == '__main__':
             member = f'p{int(key):02d}'
 
         param = f'{param_path}/{values.get("params")}'
-        submit_job_wcoss2(member, param, key, curr_datetime.strftime("%Y%m%d%H"), prev_datetime.strftime("%Y%m%d%H"))
+        job_id = submit_job_wcoss2(member, param, key, curr_datetime.strftime("%Y%m%d%H"), prev_datetime.strftime("%Y%m%d%H"))
+        job_ids.append(job_id)
+
+    # compute ensemble mean and spread
+    compute_avgspr(job_ids, curr_datetime.strftime("%Y%m%d%H"))
