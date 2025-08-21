@@ -1,0 +1,38 @@
+#!/bin/bash
+
+# load necessary modules
+module load intel/19.1.3.304
+module load grib_util
+module load wgrib2
+module list
+echo "now load new modules"
+module use /apps/dev/lmodules/intel/19.1.3.304
+module load ve/eagle/1.0
+module list
+
+curr_datetime=${1:-2025081906}
+prev_datetime=${2:-2025081900}
+PACKAGEROOT=${3:-/lfs/h2/emc/nems/noscrub/linlin.cui/git/LinlinCui-NOAA/MLGEFS}
+
+MACHINE=wcoss2
+DATAROOT=/lfs/h2/emc/ptmp/$USER
+
+cd $PACKAGEROOT/oper/wcoss2
+
+PYD=$(echo $curr_datetime | cut -c1-8)
+cyc=$(echo $curr_datetime | cut -c9-10)
+num_pressure_levels=13
+echo $prev_datetime
+echo $PYD
+echo $cyc
+
+start_time=$(date +%s)
+echo "start generating graphcast inputs for: $curr_datetime"
+# Run the Python script gdas.py with the calculated times
+python3 gen_mlgfs_ics.py "$prev_datetime" "$curr_datetime" -l "$num_pressure_levels" -o $DATAROOT/mlgfs."$PYD"/"$cyc"
+
+end_time=$(date +%s)  # Record the end time in seconds since the epoch
+
+# Calculate and print the execution time
+execution_time=$((end_time - start_time))
+echo "Execution time for gen_mlgfs_ics.py: $execution_time seconds"

@@ -43,6 +43,7 @@ class GFSDataProcessor:
         self.download_directory = download_directory
         self.keep_downloaded_data = keep_downloaded_data
         self.member = member
+        self.cycle = self.end_datetime.hour
 
         #self.s3 = boto3.client('s3')
         profile_name = os.environ.get('AWS_PROFILE', 'default')
@@ -90,7 +91,7 @@ class GFSDataProcessor:
                     print(f"Downloaded {obj_key} to {local_file_path}")
                  
         for file_format in self.file_formats:
-            curr_file = f"ge{self.member}.t{time_str}z.{file_format}"
+            curr_file = f"{self.member}.t{time_str}z.{file_format}"
             get_data(s3_prefix, curr_file, local_directory)
         
     def archive(self, date_str, time_str, local_directory):
@@ -113,7 +114,7 @@ class GFSDataProcessor:
                         print(f"Error creating symbolic link: {e}")
 
         for file_format in self.file_formats:
-            curr_file = f"ge{self.member}.t{time_str}z.{file_format}"
+            curr_file = f"{self.member}.t{time_str}z.{file_format}"
             get_data(data_path, curr_file, local_directory)
 
     def download_data(self):
@@ -203,7 +204,7 @@ class GFSDataProcessor:
                             levels = data['levels']
                             first_time_step_only = data.get('first_time_step_only', False)  # Default to False if not specified
 
-                            pattern = os.path.join(subfolder_path, f'ge{self.member}.t*z{file_extension}')
+                            pattern = os.path.join(subfolder_path, f'{self.member}.t*z{file_extension}')
                             # Use glob to search for files matching the pattern
                             matching_files = glob.glob(pattern)
                             
@@ -321,7 +322,7 @@ class GFSDataProcessor:
             self.output_directory = os.getcwd()  # Use current directory if not specified
 
         os.makedirs(self.output_directory, exist_ok=True)
-        output_netcdf = os.path.join(self.output_directory, f"source-ge{self.member}_date-{date}_res-0.25_levels-{self.num_levels}_steps-{steps}.nc")
+        output_netcdf = os.path.join(self.output_directory, f"ml{self.member}_t{self.cycle:02d}z_ic.nc")
 
         # Save the merged dataset as a NetCDF file
         ds.to_netcdf(output_netcdf)
@@ -333,7 +334,7 @@ class GFSDataProcessor:
         if not self.keep_downloaded_data:
             self.remove_downloaded_data()
 
-        print(f"Process completed successfully, your inputs for GraphCast model generated at:\n {output_netcdf}")
+        print(f"Process completed successfully!")
 
     def process_data_with_pygrib(self):
         # Define the directory where your GRIB2 files are located
@@ -491,7 +492,7 @@ class GFSDataProcessor:
 
         if self.output_directory is None:
             self.output_directory = os.getcwd()  # Use current directory if not specified
-        output_netcdf = os.path.join(self.output_directory, f"source-gdas_date-{date}_res-0.25_levels-{self.num_levels}_steps-{steps}.nc")
+        output_netcdf = os.path.join(self.output_directory, f"ml{self.member}_t{self.cycle:02d}z_ic.nc")
 
         #final_dataset = ds.assign_coords(datetime=ds.time)
         ds.to_netcdf(output_netcdf)
@@ -574,7 +575,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Download and process GEFS data")
     parser.add_argument("start_datetime", help="Start datetime in the format 'YYYYMMDDHH'")
     parser.add_argument("end_datetime", help="End datetime in the format 'YYYYMMDDHH'")
-    parser.add_argument("member", help="GEFS member options: [c00, p01, ..., p30]")
+    parser.add_argument("member", help="GEFS member options: [gec00, gep01, ..., gep30]")
     parser.add_argument("-l", "--levels", help="number of pressure levels, options: 13, 37", default="13")
     parser.add_argument("-m", "--method", help="method to extract variables from grib2, options: wgrib2, pygrib", default="wgrib2")
     parser.add_argument("-s", "--source", help="the source repository to download gdas grib2 data, options: s3 or wcoss2", default="s3")

@@ -1,7 +1,5 @@
 import os
-import socket
 import datetime
-#from datetime import datetime, timedelta
 import argparse
 import pathlib
 from time import time
@@ -11,7 +9,8 @@ import tempfile
 
 import numpy as np
 
-def get_closest_cycle(now=None, cycles=None): 
+def get_closest_cycle(now=None, cycles=[0, 6, 12, 18]): 
+
     if now is None:
         #now = datetime.datetime.now(datetime.UTC)
         now = datetime.datetime.utcnow()
@@ -28,7 +27,6 @@ def get_closest_cycle(now=None, cycles=None):
     #return cycle_time - datetime.timedelta(hours=6)
     return cycle_time
 
-
 def get_job_id(command):
     result = subprocess.run(
         command, 
@@ -44,15 +42,14 @@ def get_job_id(command):
 
     return job_id
 
-
-def submit_job_wcoss2(member, param, model_id, curr_datetime, prev_datetime):
+def submit_job_wcoss2(member, param, curr_datetime, prev_datetime, package):
     ymd=curr_datetime[:8]
     cyc=curr_datetime[8:]
 
     pbs_content = f"""#!/bin/bash
     #PBS -o {member}.out
     #PBS -e {member}.err
-    #PBS -N mlgefs{member}
+    #PBS -N fcst_{member}
     #PBS -A GFS-DEV
     #PBS -q dev 
     #PBS -l place=vscatter,select=1:ncpus=80:mpiprocs=80:mem=500G
@@ -67,19 +64,17 @@ def submit_job_wcoss2(member, param, model_id, curr_datetime, prev_datetime):
     module load ve/eagle/1.0
     module list
     
-    #curr_datetime={curr_datetime}
-    #num_pressure_levels=13
-    #forecast_length=64
     model_weights=/lfs/h2/emc/nems/noscrub/jun.wang/mlwp/aiml/gc_weights
-    DATAROOT=/lfs/h2/emc/ptmp/linlin.cui
+    DATAROOT=/lfs/h2/emc/ptmp/$USER
+    PACKAGEROOT={package}
 
-    cd /lfs/h2/emc/nems/noscrub/linlin.cui/Tests/eagle_ensemble
+    cd $PACKAGEROOT/oper/wcoss2
 
     # get input data
-    python3 gen_gefs_ics.py {prev_datetime} {curr_datetime} {member} -l 13 -s wcoss2 -o $DATAROOT/mlgefs.{ymd}/{cyc} -d $DATAROOT/mlgefs.{ymd}/{cyc}
+    python3 gen_mlgefs_ics.py {prev_datetime} {curr_datetime} {member} -l 13 -s wcoss2 -o $DATAROOT/mlgefs.{ymd}/{cyc} -d $DATAROOT/mlgefs.{ymd}/{cyc}
     
     #get forecasts
-    python3 run_graphcast_ens.py -i $DATAROOT/mlgefs.{ymd}/{cyc}/source-ge{member}_date-{curr_datetime}_res-0.25_levels-13_steps-2.nc -w $model_weights -m "{member}" -c {param} -l 64 -p 13 -o $DATAROOT/mlgefs.{ymd}/{cyc} -u no -k yes 
+    python3 run_graphcast.py -i $DATAROOT/mlgefs.{ymd}/{cyc}/ml{member}_t{cyc}z_ic.nc -w $model_weights -n ml"{member}" -c {param} -l 64 -p 13 -m grib2io -o $DATAROOT/mlgefs.{ymd}/{cyc} -u no -k yes 
     """
 
     with tempfile.NamedTemporaryFile(mode="w+", suffix=".pbs", delete=False) as tmpfile:
@@ -91,7 +86,9 @@ def submit_job_wcoss2(member, param, model_id, curr_datetime, prev_datetime):
     job_id1 = get_job_id(command1)
 
     #Step 2 - run TC_tracker
-    tpl = pathlib.Path("jAIGFS_cyclone_track_00.ecf_tmpl").read_text()
+    tpl = pathlib.Path("jMLGEFS_cyclone_track_00.ecf_tmpl").read_text()
+
+    #tracker verification code only accepts 4 letters, remove "ge" from the member -> member[2:]
     rendered = tpl.format(
         out=f'tracker_{member}.out',
         err=f'tracker_{member}.err',
@@ -99,42 +96,66 @@ def submit_job_wcoss2(member, param, model_id, curr_datetime, prev_datetime):
         jobid=job_id1, 
         ymd=curr_datetime[:8],
         cyc=curr_datetime[8:],
-        ensemble_member=member
+        ensemble_member=f"{member[2:]}"
     )
     jobcard = f"job{member}.pbs"
     pathlib.Path(jobcard).write_text(rendered)
     command2 = ['qsub', jobcard]
     job_id2 = get_job_id(command2)
 
+    return job_id1
+
+def compute_avgspr(ids, curr_datetime):
+    PDY = curr_datetime[:8]
+    cyc = curr_datetime[8:]
+    dep_str = ":".join(ids)
+    tpl = pathlib.Path("jMLGEFS_ens_debias.ecf_tmpl").read_text()
+    rendered = tpl.format(
+        jobid = dep_str, 
+        PDY = PDY, 
+        cyc = cyc,
+    )
+    jobcard = f"job.pbs"
+    pathlib.Path(jobcard).write_text(rendered)
+    command = ['qsub', jobcard]
+    job_id = get_job_id(command)
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Submit jobs on WCOSS2")
+    parser.add_argument("-w", "--workdir", help="The directory where this script locates")
 
-    #hostname = socket.gethostname()
-    #if hostname.startswith('ufe'):
-    #    param_path = '/scratch3/NCEPDEV/nems/Linlin.Cui/Tests/MLGEFSv1.0/oper/graphcast_gefs_params'
-    #elif hostname.startswith('linlincui'):
-    #    param_path = '/lustre2/Linlin.Cui/MLGEFSv1.0/weights'
-    #else:
-    #    raise NotImplementedError(f'{hostname} is not supported yet!')
+    args = parser.parse_args()
+
     param_path = '/lfs/h2/emc/nems/noscrub/linlin.cui/Tests/eagle_ensemble/model_weights'
 
-    with open('model_weights.json', 'r') as file:
+    with open('../model_weights.json', 'r') as file:
         models = json.load(file)
 
     #Get current forecast cycle
-    cycles = [0, 6, 12, 18]
-    #now = datetime.datetime(2025, 8, 15, 19, 16)
+    #If run a hindcast, specify a datetime here, otherwise use now = None
+    #now = datetime.datetime(2025, 8, 21, 6)
     now = None
-    curr_datetime = get_closest_cycle(now=now, cycles=cycles)
+    curr_datetime = get_closest_cycle(now=now)
     prev_datetime = curr_datetime - datetime.timedelta(hours=6)
     print(f'curr_datetime: {curr_datetime}')
     print(f'prev_datetime: {prev_datetime}')
 
+    job_ids = []
     for key, values in models.items():
         if key == '0':
-            member = f'c{int(key):02d}'
+            member = f'gec{int(key):02d}'
         else:
-            member = f'p{int(key):02d}'
+            member = f'gep{int(key):02d}'
 
         param = f'{param_path}/{values.get("params")}'
-        submit_job_wcoss2(member, param, key, curr_datetime.strftime("%Y%m%d%H"), prev_datetime.strftime("%Y%m%d%H"))
+        job_id = submit_job_wcoss2(
+            member, 
+            param, 
+            curr_datetime.strftime("%Y%m%d%H"), 
+            prev_datetime.strftime("%Y%m%d%H"),
+            args.workdir
+        )
+        job_ids.append(job_id)
+
+    # compute ensemble mean and spread
+    compute_avgspr(job_ids, curr_datetime.strftime("%Y%m%d%H"))
