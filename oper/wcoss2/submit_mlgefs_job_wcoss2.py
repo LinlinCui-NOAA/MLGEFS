@@ -87,6 +87,8 @@ def submit_job_wcoss2(member, param, curr_datetime, prev_datetime, package):
 
     #Step 2 - run TC_tracker
     tpl = pathlib.Path("jMLGEFS_cyclone_track_00.ecf_tmpl").read_text()
+
+    #tracker verification code only accepts 4 letters, remove "ge" from the member -> member[2:]
     rendered = tpl.format(
         out=f'tracker_{member}.out',
         err=f'tracker_{member}.err',
@@ -94,7 +96,7 @@ def submit_job_wcoss2(member, param, curr_datetime, prev_datetime, package):
         jobid=job_id1, 
         ymd=curr_datetime[:8],
         cyc=curr_datetime[8:],
-        ensemble_member=f"{member}"
+        ensemble_member=f"{member[2:]}"
     )
     jobcard = f"job{member}.pbs"
     pathlib.Path(jobcard).write_text(rendered)

@@ -48,7 +48,7 @@ if [ "$pert" = "" ]; then
    fi
 else
    export COMINgfs=$DATAROOT/mlgefs.$PDY
-   export fileprefix=ml$pert
+   export fileprefix=mlge$pert
    export modelname="M"$(echo "$pert" | tr '[:lower:]' '[:upper:]')
 fi
 #model history files
