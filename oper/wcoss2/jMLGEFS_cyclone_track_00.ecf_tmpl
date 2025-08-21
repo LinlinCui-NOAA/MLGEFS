@@ -31,7 +31,7 @@ export KEEPDATA=NO
 export PDY={ymd}
 export cyc={cyc}
 export job=aigfs_track_$cyc
-#member: EAGLE_SOLO:"", EAGLE_ENSEMBLE:c00, p01, ... , p30, weight: 0, 1, 2, ..., 30
+#member: EAGLE_SOLO:"", EAGLE_ENSEMBLE:c00, p01, ... , p30
 # EAGLE SOLO:
 #export pert=""
 #export modelversion=""
@@ -40,19 +40,14 @@ export pert={ensemble_member}
 #modelname has to be 4 letters, EAGLE_SOLO:MGFS/MGFT, EAGLE_ENSEMBLE:MC00, MP01, ..., MP30
 if [ "$pert" = "" ]; then
    export COMINgfs=$DATAROOT/mlgfs.$PDY
-   export ensmemble=""
    export fileprefix=mlgfs
    if [ "$modelversion" = "" ]; then
-       export MODELNAME="MGFS"
+       export modelname="MGFS"
    elif [ "$modelversion" = "_test" ]; then
-       export MODELNAME="MGFT"
+       export modelname="MGFT"
    fi
 else
-   #export COMINgfs=/lfs/h2/emc/nems/noscrub/linlin.cui/Tests/eagle_ensemble/$PDY$cyc
    export COMINgfs=$DATAROOT/mlgefs.$PDY
-   pertmember=`echo $pert | cut -c2-3`
-   weight=$(expr $pertmember + 0)
-   export ensmember=""
    export fileprefix=ml$pert
    export modelname="M"$(echo "$pert" | tr '[:lower:]' '[:upper:]')
 fi

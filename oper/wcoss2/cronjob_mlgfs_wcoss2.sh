@@ -10,9 +10,6 @@ HOMEDIR=${1:-/lfs/h2/emc/nems/noscrub/$USER/mlglobal}
 JOBDIR=${HOMEDIR}/oper/wcoss2
 cd $JOBDIR
 
-# delete previous files
-rm *.out *.err *.pbs
-
 # Get the UTC hour and calculate the time in the format yyyymmddhh
 current_hour=$(date -u +%H)
 current_hour=$((10#$current_hour))
@@ -44,15 +41,8 @@ sleep 60  # Simulating some work
 echo "Job 1 completed"
 
 echo "Job 2 is running"
-job2_id=$(qsub -v PDY=$PDY,cyc=$cyc jmlgfs_forecast.ecf | awk '{print $4}')
+job2_id=$(qsub -v PDY=$PDY,cyc=$cyc jmlgfs_forecast.ecf | awk '{print $1}')
 
-# Wait for job 2 to complete
-while squeue -j $job2_id &>/dev/null; do
-    sleep 5  # Adjust the polling interval as needed
-done
-sleep 5  # Simulating some work
-echo "Job 2 completed"
-
+sed "s/jobid/${job2_id}/g" jMLGFS_cyclone_track_00.ecf_tmpl > jMLGFS_cyclone_track_00.ecf
 echo "Job 3: running TC tracker"
-job3_id=$(qsub -v PDY=$PDY,cyc=$cyc,pert="" jMLGFS_cyclone_track_00.ecf | awk '{print $4}')
-
+qsub -v PDY=$PDY,cyc=$cyc,pert="" jMLGFS_cyclone_track_00.ecf

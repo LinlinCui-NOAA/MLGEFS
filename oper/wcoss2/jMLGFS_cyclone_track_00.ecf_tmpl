@@ -5,6 +5,7 @@
 #PBS -N mlgfs_tracker
 #PBS -A GFS-DEV
 #PBS -q dev
+#PBS -W depend=afterok:jobid
 #PBS -l place=vscatter,select=1:ncpus=1:mpiprocs=1:mem=10G
 #PBS -l place=excl
 #PBS -l walltime=00:30:00
@@ -47,8 +48,6 @@ if [ "$pert" = "" ]; then
    fi
 else
    export COMINgfs=$DATAROOT/mlgefs.$PDY
-   pertmember=`echo $pert | cut -c2-3`
-   weight=$(expr $pertmember + 0)
    export ensmember=""
    export fileprefix=ml$pert
    export modelname="M"$(echo "$pert" | tr '[:lower:]' '[:upper:]')

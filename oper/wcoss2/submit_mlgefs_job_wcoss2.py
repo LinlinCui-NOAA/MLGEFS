@@ -74,7 +74,7 @@ def submit_job_wcoss2(member, param, curr_datetime, prev_datetime, package):
     python3 gen_mlgefs_ics.py {prev_datetime} {curr_datetime} {member} -l 13 -s wcoss2 -o $DATAROOT/mlgefs.{ymd}/{cyc} -d $DATAROOT/mlgefs.{ymd}/{cyc}
     
     #get forecasts
-    python3 run_graphcast.py -i $DATAROOT/mlgefs.{ymd}/{cyc}/ml{member}_t{cyc}z_ic.nc -w $model_weights -m "{member}" -c {param} -l 64 -p 13 -o $DATAROOT/mlgefs.{ymd}/{cyc} -u no -k yes 
+    python3 run_graphcast.py -i $DATAROOT/mlgefs.{ymd}/{cyc}/ml{member}_t{cyc}z_ic.nc -w $model_weights -n ml"{member}" -c {param} -l 64 -p 13 -m grib2io -o $DATAROOT/mlgefs.{ymd}/{cyc} -u no -k yes 
     """
 
     with tempfile.NamedTemporaryFile(mode="w+", suffix=".pbs", delete=False) as tmpfile:
@@ -94,7 +94,7 @@ def submit_job_wcoss2(member, param, curr_datetime, prev_datetime, package):
         jobid=job_id1, 
         ymd=curr_datetime[:8],
         cyc=curr_datetime[8:],
-        ensemble_member=member[2:]
+        ensemble_member=f"{member}"
     )
     jobcard = f"job{member}.pbs"
     pathlib.Path(jobcard).write_text(rendered)
@@ -131,8 +131,8 @@ if __name__ == '__main__':
 
     #Get current forecast cycle
     #If run a hindcast, specify a datetime here, otherwise use now = None
-    now = datetime.datetime(2025, 8, 20, 12)
-    #now = None
+    #now = datetime.datetime(2025, 8, 21, 6)
+    now = None
     curr_datetime = get_closest_cycle(now=now)
     prev_datetime = curr_datetime - datetime.timedelta(hours=6)
     print(f'curr_datetime: {curr_datetime}')

@@ -33,18 +33,20 @@ class GraphCastModel:
         self, 
         pretrained_model_path, 
         gdas_data_path, 
-        member: str, 
-        config_file=None, 
-        output_dir=None, 
-        num_pressure_levels=13, 
-        forecast_length=64
+        case_name: str, 
+        config_file = None, 
+        output_dir = None, 
+        num_pressure_levels = 13, 
+        forecast_length = 64,
+        grb2method = "iris",
     ):
         self.pretrained_model_path = pretrained_model_path
         self.gdas_data_path = gdas_data_path
         self.forecast_length = forecast_length
         self.num_pressure_levels = num_pressure_levels
-        self.member = member
+        self.case_name = case_name
         self.config_file_path = config_file
+        self.grb2method = grb2method
         
         if output_dir is None:
             self.output_dir = os.getcwd()
@@ -205,26 +207,26 @@ class GraphCastModel:
         ds = ds.isel(time=slice(1, 2))
         ds['time'] = ds['time'] - pd.Timedelta(hours=6)
 
-        #if self.method == "iris":
-        #    from utils.nc2grib import Netcdf2Grib
+        if self.grb2method == "iris":
+            from utils.nc2grib import Netcdf2Grib
 
-        #    converter = Netcdf2Grib()
-        #    converter.save_grib2(self.dates[0][1], ds, self.member, self.output_dir)
+            converter = Netcdf2Grib()
+            converter.save_grib2(self.dates[0][1], ds, self.case_name, self.output_dir)
 
-        #    # Call and save forecasts in grib2
-        #    converter.save_grib2(self.dates[0][1], forecasts, self.member, self.output_dir)
+            # Call and save forecasts in grib2
+            converter.save_grib2(self.dates[0][1], forecasts, self.case_name, self.output_dir)
 
-        #elif self.method == "grib2io":
-        from utils.grib2io import Netcdf2Grib
+        elif self.grb2method == "grib2io":
+            from utils.grib2io import Netcdf2Grib
 
-        converter = Netcdf2Grib(self.dates[0][1])
-        converter.save_grib2(ds, self.member, self.output_dir)
+            converter = Netcdf2Grib(self.dates[0][1])
+            converter.save_grib2(ds, self.case_name, self.output_dir)
 
-        # Call and save forecasts in grib2
-        converter.save_grib2(forecasts, self.member, self.output_dir)
+            # Call and save forecasts in grib2
+            converter.save_grib2(forecasts, self.case_name, self.output_dir)
 
-        #else:
-        #    raise ValueError(f"Method {self.method} is not supported. Choose either 'iris' or 'grib2io'!")
+        else:
+            raise ValueError(f"Method {self.method} is not supported. Choose either 'iris' or 'grib2io'!")
         
     def upload_to_s3(self, keep_data):
         s3 = boto3.client('s3')
@@ -283,16 +285,17 @@ if __name__ == "__main__":
     parser.add_argument("-i", "--input", help="input file path (including file name)", required=True)
     parser.add_argument("-w", "--weights", help="parent directory of the graphcast params and stats", required=True)
     parser.add_argument("-l", "--length", help="length of forecast (6-hourly), an integer number in range [1, 40]", required=True)
-    parser.add_argument("-m", "--member", help="mlgfs, or gefs member [mlgec00, mlgep01, ..., mlgep30]", required=True)
+    parser.add_argument("-n", "--case_name", help="mlgfs, or gefs member [mlgec00, mlgep01, ..., mlgep30]", required=True)
     #parser.add_argument("-c", "--config", help="GC weight member file", required=True)
     parser.add_argument("-c", "--config", help="GC weight member file", default=None)
     parser.add_argument("-o", "--output", help="output directory", default=None)
     parser.add_argument("-p", "--pressure", help="number of pressure levels", default=13)
+    parser.add_argument("-m", "--grb2method", help="method to convert netCDF files to grib2 files", default="iris")
     parser.add_argument("-u", "--upload", help="upload input data as well as forecasts to noaa s3 bucket (yes or no)", default = "no")
     parser.add_argument("-k", "--keep", help="keep input and output after uploading to noaa s3 bucket (yes or no)", default = "no")
     
     args = parser.parse_args()
-    runner = GraphCastModel(args.weights, args.input, args.member, args.config, args.output, int(args.pressure), int(args.length))
+    runner = GraphCastModel(args.weights, args.input, args.case_name, args.config, args.output, int(args.pressure), int(args.length), args.grb2method)
     
     runner.load_pretrained_model()
     runner.load_gdas_data()
