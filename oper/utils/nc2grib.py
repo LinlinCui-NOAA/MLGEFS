@@ -75,7 +75,7 @@ class Netcdf2Grib:
 
     def save_grib2(self, xarray_ds, outdir):
 
-        prefix = "mlgefs" if self.case_name.startswith("mlge") else "mlgfs"
+        prefix = "aigefs" if self.case_name.startswith("mlge") else "aigfs"
 
         # Convert geopotential to geopotential height.
         xarray_ds["geopotential"] = xarray_ds["geopotential"] / 9.80665
@@ -100,8 +100,8 @@ class Netcdf2Grib:
             # Set output GRIB2 file.
             cycle = self.start_date.hour
             lead = int(time.dt.total_seconds()//3600)
-            outfile_sfc = os.path.join(outdir, f"{prefix}.t{cycle:02d}z.sfc.0p25.f{lead:03d}.grib2")
-            outfile_pres = os.path.join(outdir, f"{prefix}.t{cycle:02d}z.pres.0p25.f{lead:03d}.grib2")
+            outfile_sfc = os.path.join(outdir, f"{prefix}.t{cycle:02d}z.sfc.f{lead:03d}.grib2")
+            outfile_pres = os.path.join(outdir, f"{prefix}.t{cycle:02d}z.pres.f{lead:03d}.grib2")
 
             # Delete the old file.
             for outfile in [outfile_sfc, outfile_pres]:
