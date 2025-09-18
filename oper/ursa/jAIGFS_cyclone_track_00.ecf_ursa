@@ -28,33 +28,33 @@ export envir=dev
 export PACKAGEROOT=/scratch3/NCEPDEV/nems/Linlin.Cui/git/others/TC_tracker
 export DATAROOT=/scratch3/NCEPDEV/stmp/Linlin.Cui/ptmp
 export COMROOT=${DATAROOT}/com
-export KEEPDATA=YES
+export KEEPDATA=NO
 
 # experiment configurations:
 #export PDY=20250626
 #export cyc=00
 export job=aigfs_track_${cyc}
-#member: EAGLE_SOLO:"", EAGLE_ENSEMBLE:c00, p01, ... , p30, weight: 0, 1, 2, ..., 30
+#member: EAGLE_SOLO:"", EAGLE_ENSEMBLE:C00, P01, ... , P30, weight: 0, 1, 2, ..., 30
 # EAGLE SOLO:
 #export pert=""
 # EAGLE ensemble
-#export pert="c00"
-#export pert="p01"
+#export pert="C00"
+#model name has to be 4 letters, EAGLE_SOLO:MGFS, EAGLE_ENSEMBLE:MC00, MP01, ..., MP30
 export pert=${gefs_member}
-#modelname has to be 4 letters, EAGLE_SOLO:ggfs, EAGLE_ENSEMBLE:gc00, gp01, ..., gp30
 if [ "$pert" = "" ]; then
    #export COMINgfs=/scratch3/NCEPDEV/nems/Jun.Wang/tracker/input/graphcastgfs.${PDY}
    export COMINgfs=/scratch3/NCEPDEV/nems/Linlin.Cui/Tests/MLGEFSv1.0/oper/graphcastgfs.${PDY}
    export ensemble=""
    export fileprefix=graphcastgfs
-   export modelname="ggfs"
+   export modelname="MGFS"
 else
-   export COMINgfs=/scratch3/NCEPDEV/nems/Linlin.Cui/Tests/MLGEFSv1.0/oper/$PDY$cyc
+   export COMINgfs=/scratch3/NCEPDEV/stmp/$USER/pmlgefs.$PDY/$cyc
    pertmember=`echo $pert | cut -c2-3`
    weight=$(expr $pertmember + 0)
    export ensmember=forecasts_13_levels_${pert}_model_${weight}
    export fileprefix=pmlgefs${pert}
-   export modelname="g"${pert}
+   export modelname="M"$(echo "$pert" | tr '[:lower:]' '[:upper:]')
+   #modelname=$(echo "$modelname" | tr '[:lower:]' '[:upper:]')
 fi
 #model history files
 export COMINsyn=/scratch3/NCEPDEV/nems/Linlin.Cui/Tests/MLGEFSv1.0/oper/tracker/syndat

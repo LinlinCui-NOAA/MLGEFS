@@ -10,7 +10,10 @@ import json
 
 import numpy as np
 
-def get_closest_cycle(now=None, cycles=None): 
+def get_closest_cycle(now=None): 
+
+    cycles = [0, 6, 12, 18]
+
     if now is None:
         now = datetime.datetime.now(datetime.UTC)
         #now = datetime.utcnow()
@@ -49,7 +52,7 @@ def submit_slurm_run(member, param, model_id, curr_datetime, prev_datetime):
     #Step 1 - generate input file
     command1 = [
         'sbatch', '--nodes=1', '--ntasks=1', '--mem=10g', '--account=nems', '--partition=u1-service', \
-        '--time=30:00', f'--job-name=getdata_{member}', f'--output=slurm/getdata_{member}.out', f'--error=slurm/getdata_{member}.err', \
+        '--time=30:00', f'--job-name=getdata_{member}', f'--output=slurm/getdata_{member}_%j.out', f'--error=slurm/getdata_{member}_%j.err', \
         f'--export=gefs_member={member},config_path={param},model_id={model_id},curr_datetime={curr_datetime},prev_datetime={prev_datetime}', \
         'mlgefs_prepdata_ursa.sh'
     ]
@@ -57,26 +60,34 @@ def submit_slurm_run(member, param, model_id, curr_datetime, prev_datetime):
 
     #Step 2 - run graphcast
     command2 = ['sbatch', f'--dependency=afterok:{job_id1}', '--nodes=1', '--account=nems', '--partition=u1-h100', \
-        '--qos=gpuwf', '--gres=gpu:h100:2', '--exclude=u22g[09-10]', '--time=30:00', f'--job-name=run_{member}', f'--output=slurm/gcgfs_{member}.out', \
-        f'--error=slurm/gcgfs_{member}.err', f'--export=gefs_member={member},config_path={param},model_id={model_id},curr_datetime={curr_datetime}', \
+        '--qos=gpuwf', '--gres=gpu:h100:1', '--exclusive', '--time=30:00', f'--job-name=run_{member}', f'--output=slurm/fcst_{member}_%j.out', \
+        f'--error=slurm/fcst_{member}_%j.err', f'--export=gefs_member={member},config_path={param},model_id={model_id},curr_datetime={curr_datetime}', \
         'mlgefs_runfcst_ursa.sh']
     job_id2 = get_job_id(command2)
 
     #Step 3 - run TC_tracker
     command3 = ['sbatch', f'--dependency=afterok:{job_id2}', '--nodes=1', '--ntasks=1', '--account=nems', \
-        '--partition=u1-compute', '--time=30:00', '--mem=90g', f'--job-name=tctracker_{member}', f'--output=slurm/tctracker_{member}.out', \
-        f'--error=slurm/tctracker_{member}.err', f'--export=gefs_member={member},PDY={curr_datetime[:8]},cyc={curr_datetime[8:]}', \
+        '--partition=u1-compute', '--time=30:00', '--mem=90g', f'--job-name=tctracker_{member}', f'--output=slurm/tctracker_{member}_%j.out', \
+        f'--error=slurm/tctracker_{member}_%j.err', f'--export=gefs_member={member},PDY={curr_datetime[:8]},cyc={curr_datetime[8:]}', \
         'jAIGFS_cyclone_track_00.ecf_ursa']
     job_id3 = get_job_id(command3)
 
-    #Step 4 - upload data to s3 bucket
-    command4 = ['sbatch', f'--dependency=afterok:{job_id3}', '--nodes=1', '--ntasks=1', '--account=nems', \
-        '--partition=u1-service', '--time=30:00', f'--job-name=datadissm_{member}', f'--output=slurm/datadissm_{member}.out', \
-        f'--error=slurm/datadissm_{member}.err', f'--export=gefs_member={member},model_id={model_id},curr_datetime={curr_datetime}', \
-        'mlgefs_datadissm_ursa.sh']
-    job_id4 = get_job_id(command4)
+    ##Step 4 - upload data to s3 bucket
+    #command4 = ['sbatch', f'--dependency=afterok:{job_id3}', '--nodes=1', '--ntasks=1', '--account=nems', \
+    #    '--partition=u1-service', '--time=30:00', f'--job-name=datadissm_{member}', f'--output=slurm/datadissm_{member}%j.out', \
+    #    f'--error=slurm/datadissm_{member}%j.err', f'--export=gefs_member={member},model_id={model_id},curr_datetime={curr_datetime}', \
+    #    'mlgefs_datadissm_ursa.sh']
+    #job_id4 = get_job_id(command4)
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Download and process GEFS data")
+    parser.add_argument("-d", "--start_datetime", help="Start datetime in the format 'YYYYMMDDHH'", default=None)
+    args = parser.parse_args()
+
+    if args.start_datetime is not None:
+        now = datetime.datetime.strptime(args.start_datetime, "%Y%m%d%H")
+    else:
+        now = None
 
     hostname = socket.gethostname()
     if hostname.startswith('ufe'):
@@ -90,9 +101,7 @@ if __name__ == '__main__':
         models = json.load(file)
 
     #Get current forecast cycle
-    cycles = [0, 6, 12, 18]
-    now = None
-    curr_datetime = get_closest_cycle(now=now, cycles=cycles)
+    curr_datetime = get_closest_cycle(now=now)
     prev_datetime = curr_datetime - datetime.timedelta(hours=6)
     print(f'curr_datetime: {curr_datetime}')
     print(f'prev_datetime: {prev_datetime}')
