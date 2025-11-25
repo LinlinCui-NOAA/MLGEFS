@@ -56,12 +56,6 @@ class Grib2Writer:
         if self.case_name.startswith("aige"):
             number = int(self.case_name[-2:])
             msg.perturbationNumber = number
-            if "c00" in self.case_name:
-                msg.typeOfEnsembleForecast = 1
-                msg.typeOfData = 3
-            else:
-                msg.typeOfEnsembleForecast = 3
-                msg.typeOfData = 4
 
         # update decScaleFactor for specific humidity
         # 12 for [5000, 10000]Pa, 10 for [15000, ..., 40000]Pa, 8 for [50000, ..., 100000]Pa
@@ -142,13 +136,13 @@ class Grib2Writer:
             if "level" in da.coords.keys():
                 for level in da.coords["level"]:
                     msg = self.create_grib2_message(var, da, lead, level=level)
-                    msg.data = da.sel(level=level).values
+                    msg.data = np.squeeze(da.sel(level=level).values)
                     msg.pack()
                     print(f"\t{msg}")
                     grib2_out_pres.write(msg)
             else:
                 msg = self.create_grib2_message(var, da, lead)
-                msg.data = da.values
+                msg.data = np.squeeze(da.values)
                 msg.pack()
                 print(f"\t{msg}")
                 grib2_out_sfc.write(msg)
